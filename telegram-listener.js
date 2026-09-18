@@ -81,13 +81,13 @@ async function main() {
   client.addEventHandler((event) => {
     const message = event.message;
     const text = message && (message.message || message.text || '');
-    if (!message || message.out || !sourceAllowed(message)) return;
+    if (!message || !sourceAllowed(message)) return;
 
     const targetUrl = extractTargetLink(text);
     if (!targetUrl) return;
 
     queuedCount++;
-    console.log(`[queue] กำลังทำ ${activeCount} | รอ ${queuedCount}`);
+    console.log(`[รับลิงก์] ${message.out ? 'ข้อความที่คุณส่ง' : 'ข้อความเข้า'} | กำลังทำ ${activeCount} | รอ ${queuedCount}`);
     updateQueueStatus();
     queue = queue.then(async () => {
       queuedCount--;
@@ -119,7 +119,7 @@ async function main() {
         updateQueueStatus();
       }
     }).catch((error) => console.error('[queue]', error));
-  }, new NewMessage({ incoming: true }));
+  }, new NewMessage({}));
 
   const shutdown = async () => {
     console.log('\nกำลังปิด userbot...');
