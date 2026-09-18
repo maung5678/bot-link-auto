@@ -1,0 +1,17 @@
+{
+  "name": "vps-link-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Telegram -> filter link -> Playwright bypass ad-gate -> save final URL to DB",
+  "main": "telegram-listener.js",
+  "scripts": {
+    "start": "node telegram-listener.js",
+    "test-controller": "node controller.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.2",
+    "input": "^1.0.1",
+    "playwright": "^1.47.0",
+    "telegram": "^2.26.22"
+  }
+}
