@@ -27,7 +27,7 @@ powershell -ExecutionPolicy Bypass -File .\setup-vps.ps1
 
 1. สร้าง Project ใน Supabase
 2. เปิด SQL Editor
-3. เปิดไฟล์ `supabase\migrations\001_initial.sql` แล้วคัดลอกทั้งหมดไปกด Run
+3. เปิดไฟล์ใน `supabase\migrations` แล้ว Run ตามลำดับชื่อไฟล์ (`001...` แล้ว `002...`)
 4. เปิด Connect/API Keys แล้วนำ Project URL และ Secret key ไปกรอกในตัวติดตั้ง
 5. ห้ามนำ Secret key ไปใส่ในหน้าเว็บหรือ GitHub
 
