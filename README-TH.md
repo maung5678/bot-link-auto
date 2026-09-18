@@ -36,7 +36,7 @@ powershell -ExecutionPolicy Bypass -File .\setup-vps.ps1
 1. เริ่มจาก Test mode
 2. คัดลอก Secret key (`sk_test_...`)
 3. สร้าง webhook endpoint เป็น `https://โดเมนของคุณ/stripe/webhook`
-4. เลือก event `checkout.session.completed`
+4. เลือก events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `charge.refunded`, `charge.dispute.created`
 5. คัดลอก Signing secret (`whsec_...`)
 6. ทดสอบการจ่ายครบก่อนเปลี่ยนเป็น Live mode
 

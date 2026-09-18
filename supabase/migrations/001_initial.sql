@@ -53,9 +53,10 @@ create table if not exists public.payments (
   user_id text not null references public.users(telegram_id),
   package_id text not null references public.packages(id),
   amount_thb integer not null,
-  status text not null default 'pending' check(status in ('pending','paid','cancelled','refunded')),
+  status text not null default 'pending' check(status in ('pending','paid','cancelled','refunded','disputed')),
   stripe_checkout_session_id text unique,
   stripe_payment_intent_id text,
+  stripe_charge_id text,
   stripe_event_id text unique,
   created_at timestamptz not null default now(),
   paid_at timestamptz

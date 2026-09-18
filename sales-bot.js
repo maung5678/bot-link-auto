@@ -93,8 +93,19 @@ async function createCheckout(chatId, userId, packageId) {
   const payment = await must(await supabase.from('payments').insert({
     user_id: String(userId), package_id: pkg.id, amount_thb: pkg.price_thb
   }).select('*').single(), 'สร้างรายการชำระเงิน');
+  const user = await getUser(userId);
+  let customerId = user.stripe_customer_id;
+  if (!customerId) {
+    const customer = await stripe.customers.create({
+      name: user.display_name || user.username || `Telegram ${userId}`,
+      metadata: { telegram_user_id: String(userId) }
+    }, { idempotencyKey: `telegram_customer_${userId}` });
+    customerId = customer.id;
+    await must(await supabase.from('users').update({ stripe_customer_id: customerId, updated_at: new Date().toISOString() }).eq('telegram_id', String(userId)), 'บันทึก Stripe customer');
+  }
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
+    customer: customerId,
     line_items: [{ price_data: {
       currency: 'thb', unit_amount: pkg.price_thb * 100,
       product_data: { name: pkg.name, description: pkg.description }
@@ -102,7 +113,7 @@ async function createCheckout(chatId, userId, packageId) {
     metadata: { payment_id: payment.id, telegram_user_id: String(userId), package_id: pkg.id },
     success_url: `${PUBLIC_BASE_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${PUBLIC_BASE_URL}/payment-cancelled`
-  });
+  }, { idempotencyKey: `checkout_${payment.id}` });
   await must(await supabase.from('payments').update({ stripe_checkout_session_id: session.id }).eq('id', payment.id), 'ผูก Stripe session');
   return bot.sendMessage(chatId, `แพ็กเกจ: ${pkg.name}\nยอดชำระ: ${pkg.price_thb} บาท\n\nกดปุ่มด้านล่างเพื่อชำระเงิน`, {
     reply_markup: { inline_keyboard: [[{ text: '🔒 ไปหน้าชำระเงิน Stripe', url: session.url }], [{ text: '⬅️ กลับ', callback_data: 'shop' }]] }

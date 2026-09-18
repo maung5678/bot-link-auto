@@ -50,10 +50,14 @@ async function stripeWebhook(req, res) {
   } catch (error) {
     return send(res, 400, { error: `Webhook signature: ${error.message}` });
   }
-  if (event.type === 'checkout.session.completed' && event.data.object.payment_status === 'paid') {
+  if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type) && event.data.object.payment_status === 'paid') {
     const checkout = event.data.object;
     const paymentId = checkout.metadata && checkout.metadata.payment_id;
     if (paymentId) {
+      const payment = await must(await supabase.from('payments').select('id,user_id,amount_thb,status').eq('id', paymentId).single(), 'ตรวจรายการชำระเงิน');
+      if (checkout.currency !== 'thb' || checkout.amount_total !== payment.amount_thb * 100) {
+        throw new Error(`ยอดหรือสกุลเงินไม่ตรง payment=${paymentId}`);
+      }
       const result = await must(await supabase.rpc('fulfill_payment', {
         p_payment_id: paymentId, p_event_id: event.id,
         p_intent_id: typeof checkout.payment_intent === 'string' ? checkout.payment_intent : null
@@ -64,6 +68,22 @@ async function stripeWebhook(req, res) {
         }).catch((error) => console.error('[payment notify]', error.message));
       }
     }
+  }
+  if (event.type === 'checkout.session.async_payment_failed') {
+    const paymentId = event.data.object.metadata && event.data.object.metadata.payment_id;
+    if (paymentId) await must(await supabase.from('payments').update({ status: 'cancelled' }).eq('id', paymentId).eq('status', 'pending'), 'บันทึกการจ่ายไม่สำเร็จ');
+  }
+  if (event.type === 'charge.refunded') {
+    const charge = event.data.object;
+    if (charge.payment_intent) await must(await supabase.from('payments').update({ status: 'refunded', stripe_charge_id: charge.id }).eq('stripe_payment_intent_id', charge.payment_intent), 'บันทึก refund');
+    await setRuntime('stripe_alert', 'warning', `มี refund: ${charge.id}`);
+  }
+  if (event.type === 'charge.dispute.created') {
+    const dispute = event.data.object;
+    const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge && dispute.charge.id;
+    const intentId = typeof dispute.payment_intent === 'string' ? dispute.payment_intent : dispute.payment_intent && dispute.payment_intent.id;
+    if (intentId) await must(await supabase.from('payments').update({ status: 'disputed', stripe_charge_id: chargeId || null }).eq('stripe_payment_intent_id', intentId), 'บันทึก dispute');
+    await setRuntime('stripe_alert', 'warning', `มี dispute: ${dispute.id}`);
   }
   send(res, 200, { received: true });
 }
