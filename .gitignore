@@ -3,3 +3,7 @@ node_modules/
 telegram.session
 *.session
 results.jsonl
+data/
+.stripe/
+.playwright-cli/
+output/

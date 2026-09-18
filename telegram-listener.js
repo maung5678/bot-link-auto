@@ -10,7 +10,8 @@ const { StringSession } = require('telegram/sessions');
 const { NewMessage } = require('telegram/events');
 const { extractTargetLink } = require('./link-filter');
 const { resolveLinkResult } = require('./controller');
-const { appendResult, RESULT_FILE } = require('./result-store');
+const { saveResult, RESULT_FILE } = require('./result-store');
+const { setRuntime } = require('./supabase-client');
 
 const API_ID = Number(process.env.TELEGRAM_API_ID);
 const API_HASH = process.env.TELEGRAM_API_HASH || '';
@@ -64,10 +65,15 @@ async function main() {
   saveSession(client);
 
   let queue = Promise.resolve();
+  let queuedCount = 0;
+  let activeCount = 0;
+  const updateQueueStatus = () => setRuntime('collector', activeCount ? 'working' : 'ready', `กำลังทำ ${activeCount} | รอ ${queuedCount}`).catch(() => {});
   console.log('Telegram userbot เริ่มทำงานแล้ว');
   console.log(`ส่งผลลัพธ์ไปที่: ${RESULT_CHAT}`);
   console.log(`Chromium headless: ${PLAYWRIGHT_HEADLESS}`);
   console.log(`ไฟล์บันทึกผลลัพธ์: ${RESULT_FILE}`);
+  console.log('✅ Collector พร้อมรับลิงก์แล้ว');
+  await updateQueueStatus();
   if (SOURCE_CHATS.size === 0) {
     console.warn('คำเตือน: ไม่ได้ตั้ง TELEGRAM_SOURCE_CHATS — จะตรวจทุกแชทและแชนแนลของบัญชีนี้');
   }
@@ -80,12 +86,18 @@ async function main() {
     const targetUrl = extractTargetLink(text);
     if (!targetUrl) return;
 
+    queuedCount++;
+    console.log(`[queue] กำลังทำ ${activeCount} | รอ ${queuedCount}`);
+    updateQueueStatus();
     queue = queue.then(async () => {
+      queuedCount--;
+      activeCount++;
+      updateQueueStatus();
       const source = message.chatId ? String(message.chatId) : 'unknown';
       console.log(`[job] source=${source} url=${targetUrl}`);
       try {
         const result = await resolveLinkResult(targetUrl, { headless: PLAYWRIGHT_HEADLESS });
-        const record = appendResult({
+        const record = await saveResult({
           sourceChatId: source,
           sourceMessageId: message.id,
           ...result
@@ -101,6 +113,10 @@ async function main() {
           message: `ทำรายการไม่สำเร็จ\nต้นทาง: ${targetUrl}\nสาเหตุ: ${error.message}`,
           linkPreview: false
         });
+      } finally {
+        activeCount--;
+        console.log(`[queue] กำลังทำ ${activeCount} | รอ ${queuedCount}`);
+        updateQueueStatus();
       }
     }).catch((error) => console.error('[queue]', error));
   }, new NewMessage({ incoming: true }));

@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { supabase, must } = require('./supabase-client');
 
 const RESULT_FILE = process.env.RESULT_FILE || path.join(__dirname, 'results.jsonl');
 
@@ -14,7 +15,7 @@ function bangkokTimestamp(date) {
   }).format(date).replace(' ', 'T') + '+07:00';
 }
 
-function appendResult(result) {
+async function saveResult(result) {
   const now = new Date();
   const record = {
     recordedAtUtc: now.toISOString(),
@@ -22,7 +23,16 @@ function appendResult(result) {
     ...result
   };
   fs.appendFileSync(RESULT_FILE, JSON.stringify(record) + '\n', 'utf8');
+  await must(await supabase.from('links').upsert({
+    start_url: result.startUrl,
+    note_url: result.noteUrl,
+    file_video_url: result.fileVideoUrl,
+    telegram_url: result.telegramUrl,
+    source_chat_id: result.sourceChatId,
+    source_message_id: result.sourceMessageId == null ? null : String(result.sourceMessageId),
+    active: true
+  }, { onConflict: 'telegram_url' }), 'บันทึกลิงก์ลง Supabase');
   return record;
 }
 
-module.exports = { appendResult, RESULT_FILE };
+module.exports = { saveResult, RESULT_FILE };

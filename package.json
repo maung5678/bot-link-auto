@@ -1,17 +1,23 @@
 {
   "name": "vps-link-bot",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Telegram -> filter link -> Playwright bypass ad-gate -> save final URL to DB",
-  "main": "telegram-listener.js",
+  "main": "service-runner.js",
   "scripts": {
-    "start": "node telegram-listener.js",
+    "start": "node service-runner.js",
+    "collector": "node telegram-listener.js",
+    "sales": "node sales-bot.js",
+    "dashboard": "node dashboard-server.js",
+    "check-config": "node health-check.js",
     "test-controller": "node controller.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.57.4",
     "dotenv": "^17.2.2",
     "input": "^1.0.1",
     "playwright": "^1.47.0",
+    "stripe": "^22.6.2",
     "telegram": "^2.26.22"
   }
 }

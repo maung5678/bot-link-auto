@@ -1,4 +1,4 @@
-# VPS Link Bot
+# Bot Link Auto — คู่มือภาษาไทย
 
 ## สิ่งที่ต้องมี
 
@@ -6,6 +6,10 @@
 - Node.js LTS
 - บัญชี Telegram ที่เป็นสมาชิกแชทหรือแชนแนลต้นทาง
 - Telegram API ID และ API Hash จาก my.telegram.org
+- Bot Token ใหม่จาก BotFather สำหรับบอทหน้าร้าน
+- Supabase project URL และ Secret key
+- Stripe Secret key และ Webhook signing secret
+- โดเมน HTTPS ที่ชี้มายัง Dashboard port 8787
 
 ## ติดตั้งครั้งแรกจาก GitHub
 
@@ -17,7 +21,30 @@ cd bot-link-auto
 powershell -ExecutionPolicy Bypass -File .\setup-vps.ps1
 ```
 
-สคริปต์จะถาม API ID, API Hash, แชทต้นทาง และติดตั้ง Chromium ให้อัตโนมัติ
+สคริปต์จะถาม Telegram, Supabase, Stripe, URL หน้าเว็บ, รหัสผ่านแอดมิน และติดตั้ง Chromium ให้อัตโนมัติ
+
+## เตรียม Supabase
+
+1. สร้าง Project ใน Supabase
+2. เปิด SQL Editor
+3. เปิดไฟล์ `supabase\migrations\001_initial.sql` แล้วคัดลอกทั้งหมดไปกด Run
+4. เปิด Connect/API Keys แล้วนำ Project URL และ Secret key ไปกรอกในตัวติดตั้ง
+5. ห้ามนำ Secret key ไปใส่ในหน้าเว็บหรือ GitHub
+
+## เตรียม Stripe
+
+1. เริ่มจาก Test mode
+2. คัดลอก Secret key (`sk_test_...`)
+3. สร้าง webhook endpoint เป็น `https://โดเมนของคุณ/stripe/webhook`
+4. เลือก event `checkout.session.completed`
+5. คัดลอก Signing secret (`whsec_...`)
+6. ทดสอบการจ่ายครบก่อนเปลี่ยนเป็น Live mode
+
+หลังเตรียม Supabase/Stripe แล้วตรวจทั้งหมดด้วย:
+
+```powershell
+npm.cmd run check-config
+```
 
 ## เริ่มทำงาน
 
@@ -40,7 +67,7 @@ npm.cmd start
 
 ครั้งแรกกรอกเบอร์โทร, OTP และรหัส 2FA ในหน้าต่าง Terminal หลังจากนั้นระบบใช้ `telegram.session` อัตโนมัติ
 
-ผลลัพธ์จะส่งเข้า Saved Messages และบันทึกใน `results.jsonl` พร้อมเวลา UTC/เวลาไทย
+Collector จะบันทึกลิงก์ลง Supabase และ `results.jsonl`; ลูกค้าใช้ Sales Bot ซื้อเครดิต/สมาชิกและสุ่มลิงก์ ส่วนผู้ดูแลเปิด `http://localhost:8787/dashboard`
 
 ## ไฟล์สำคัญที่ห้ามแชร์
 
