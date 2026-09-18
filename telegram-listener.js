@@ -51,6 +51,23 @@ function sourceAllowed(message) {
   return [...SOURCE_CHATS].some((allowed) => keys.has(allowed));
 }
 
+function telegramUrls(message, text) {
+  const urls = [];
+  for (const entity of message.entities || []) {
+    if (entity.url) urls.push(entity.url);
+    else if (Number.isInteger(entity.offset) && Number.isInteger(entity.length)) {
+      const value = String(text || '').slice(entity.offset, entity.offset + entity.length);
+      if (/^https?:\/\//i.test(value)) urls.push(value);
+    }
+  }
+  const webpageUrl = message.media && message.media.webpage && message.media.webpage.url;
+  if (webpageUrl) urls.push(webpageUrl);
+  for (const row of (message.replyMarkup && message.replyMarkup.rows) || []) {
+    for (const button of row.buttons || []) if (button.url) urls.push(button.url);
+  }
+  return [...new Set(urls)];
+}
+
 async function main() {
   const client = new TelegramClient(new StringSession(readSession()), API_ID, API_HASH, {
     connectionRetries: 5
@@ -83,8 +100,15 @@ async function main() {
     const text = message && (message.message || message.text || '');
     if (!message || !sourceAllowed(message)) return;
 
-    const targetUrl = extractTargetLink(text);
-    if (!targetUrl) return;
+    const extraUrls = telegramUrls(message, text);
+    const targetUrl = extractTargetLink(text, extraUrls);
+    if (!targetUrl) {
+      if (/https?:\/\//i.test(text) || extraUrls.length) {
+        const source = message.chatId ? String(message.chatId) : 'unknown';
+        console.log(`[ข้ามลิงก์] source=${source} ไม่ตรงโดเมนใน link-patterns.json`);
+      }
+      return;
+    }
 
     queuedCount++;
     console.log(`[รับลิงก์] ${message.out ? 'ข้อความที่คุณส่ง' : 'ข้อความเข้า'} | กำลังทำ ${activeCount} | รอ ${queuedCount}`);

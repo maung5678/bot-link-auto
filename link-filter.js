@@ -16,10 +16,12 @@ function loadPatterns() {
  * @param {string} text ข้อความ Telegram ทั้งก้อน
  * @returns {string|null} ลิงก์เป้าหมาย หรือ null ถ้าไม่เจอ
  */
-function extractTargetLink(text) {
+function extractTargetLink(text, extraUrls = []) {
   const { targetDomains } = loadPatterns();
-  const urlRe = /https?:\/\/[^\s\]]+/g;
-  const found = text.match(urlRe) || [];
+  const urlRe = /https?:\/\/[^\s<>]+/g;
+  const found = [...(String(text || '').match(urlRe) || []), ...extraUrls]
+    .map((url) => String(url || '').trim().replace(/[\]\[(){}.,;:!?"']+$/g, ''))
+    .filter(Boolean);
 
   for (const url of found) {
     let hostname;
