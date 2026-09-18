@@ -4,7 +4,7 @@ Windows VPS Telegram userbot สำหรับรับลิงก์ `oklink2
 
 ## ติดตั้งบน Windows VPS
 
-Repository นี้เป็น private จึงต้องล็อกอิน GitHub หรือกำหนด SSH deploy key/PAT แบบ read-only บน VPS ก่อน `clone` และ `pull`
+Repository นี้เป็น public จึง `clone` และ `pull` บน VPS ได้โดยไม่ต้องล็อกอิน GitHub
 
 ```powershell
 git clone https://github.com/maung5678/bot-link-auto.git

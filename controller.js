@@ -115,6 +115,7 @@ async function resolveLinkResult(startUrl, opts = {}) {
     : [];
   const context = await chromium.launchPersistentContext(userDataDir, {
     headless,
+    ...(headless ? { channel: 'chromium' } : {}),
     args: extensionArgs
   });
   const page = context.pages()[0] || await context.newPage();
