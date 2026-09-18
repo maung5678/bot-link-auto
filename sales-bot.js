@@ -13,12 +13,42 @@ let botUsername = '';
 
 const menu = {
   inline_keyboard: [
-    [{ text: '🎲 สุ่มลิงก์', callback_data: 'random' }],
-    [{ text: '💳 ซื้อเครดิต/สมาชิก', callback_data: 'shop' }],
-    [{ text: '👤 บัญชีของฉัน', callback_data: 'account' }, { text: '👥 แนะนำเพื่อน', callback_data: 'referral' }],
-    [{ text: '☎️ ติดต่อผู้ดูแล', callback_data: 'support' }]
+    [{ text: '🎁 รับลิงก์ทันที', callback_data: 'random' }],
+    [{ text: '🛒 ซื้อเครดิต / แพ็กเกจ', callback_data: 'shop' }],
+    [{ text: '💰 เช็กเครดิตและวันใช้งาน', callback_data: 'account' }],
+    [{ text: '🎉 ชวนเพื่อน รับเครดิตฟรี', callback_data: 'referral' }],
+    [{ text: '❓ วิธีใช้ / ติดต่อผู้ดูแล', callback_data: 'support' }]
   ]
 };
+
+const homeButton = [{ text: '🏠 กลับหน้าหลัก', callback_data: 'menu' }];
+
+function escapeHtml(value) {
+  return String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+}
+
+function homeText(note = '') {
+  return [
+    '✨ <b>ร้านลิงก์อัตโนมัติ</b>',
+    '',
+    note || 'เลือกสิ่งที่ต้องการจากปุ่มด้านล่างได้เลยครับ',
+    '',
+    '① เติมเครดิตหรือซื้อแพ็กเกจ',
+    '② กด “รับลิงก์ทันที”',
+    '③ เปิดลิงก์และรับชมได้เลย'
+  ].join('\n');
+}
+
+async function render(chatId, text, replyMarkup, messageId) {
+  const options = { parse_mode: 'HTML', reply_markup: replyMarkup };
+  if (messageId) {
+    try { return await bot.editMessageText(chatId, messageId, text, options); }
+    catch (error) {
+      if (/message is not modified/i.test(error.message)) return null;
+    }
+  }
+  return bot.sendMessage(chatId, text, options);
+}
 
 function referralCode(id) {
   try { return BigInt(String(id)).toString(36).toUpperCase(); }
@@ -53,41 +83,43 @@ async function getUser(id) {
   return must(await supabase.from('users').select('*').eq('telegram_id', String(id)).single(), 'อ่านบัญชี');
 }
 
-async function showMenu(chatId, text = 'เลือกเมนูที่ต้องการได้เลยครับ') {
-  return bot.sendMessage(chatId, text, { reply_markup: menu });
+async function showMenu(chatId, note = '', messageId) {
+  return render(chatId, homeText(note), menu, messageId);
 }
 
 async function start(message) {
   const ref = (message.text || '').split(/\s+/)[1];
   const user = await ensureUser(message.from, ref && ref.startsWith('ref_') ? ref.slice(4) : null);
   if (!user.terms_accepted) {
-    return bot.sendMessage(message.chat.id,
-      'ยินดีต้อนรับครับ\n\nร้านนี้จำหน่ายเฉพาะเนื้อหาทั่วไปที่ได้รับอนุญาต การซื้อสำเร็จแล้วไม่สามารถโอนเครดิตให้บัญชีอื่นได้\n\nกรุณากดยอมรับเงื่อนไขก่อนใช้งาน', {
-        reply_markup: { inline_keyboard: [[{ text: '✅ ยอมรับเงื่อนไขและเริ่มใช้งาน', callback_data: 'accept_terms' }]] }
-      });
+    return render(message.chat.id,
+      '👋 <b>ยินดีต้อนรับครับ</b>\n\nก่อนเริ่มใช้งาน กรุณายืนยันว่า:\n\n✅ ใช้บริการสำหรับเนื้อหาที่ได้รับอนุญาตเท่านั้น\n✅ เครดิตใช้ได้กับบัญชีนี้และโอนให้ผู้อื่นไม่ได้\n✅ ตรวจสอบแพ็กเกจก่อนชำระเงิน\n\nกดปุ่มด้านล่างเพื่อเริ่มใช้งาน',
+      { inline_keyboard: [[{ text: '✅ ยอมรับและเริ่มใช้งาน', callback_data: 'accept_terms' }]] });
   }
-  return showMenu(message.chat.id, 'ยินดีต้อนรับกลับครับ');
+  return showMenu(message.chat.id, 'ยินดีต้อนรับกลับครับ 👋');
 }
 
-async function showAccount(chatId, userId) {
+async function showAccount(chatId, userId, messageId) {
   const user = await getUser(userId);
   const subscribed = user.subscription_until && new Date(user.subscription_until) > new Date();
-  const until = subscribed ? new Date(user.subscription_until).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }) : 'ไม่มี';
-  return showMenu(chatId, `👤 บัญชีของฉัน\n\nเครดิตคงเหลือ: ${user.credits}\nสมาชิกถึง: ${until}`);
+  const until = subscribed ? new Date(user.subscription_until).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }) : 'ยังไม่มีแพ็กเกจรายวัน';
+  return render(chatId,
+    `💰 <b>เครดิตและวันใช้งาน</b>\n\n🎟 เครดิตคงเหลือ: <b>${user.credits} เครดิต</b>\n📅 ใช้งานไม่จำกัดถึง: <b>${until}</b>\n\n1 เครดิต ใช้รับลิงก์ได้ 1 ครั้ง`,
+    { inline_keyboard: [[{ text: '🛒 เติมเครดิต', callback_data: 'shop' }], homeButton] }, messageId);
 }
 
-async function showShop(chatId) {
+async function showShop(chatId, messageId) {
   const packages = await must(await supabase.from('packages').select('*').eq('active', true).order('sort_order'), 'อ่านแพ็กเกจ');
   const keyboard = packages.map((item) => [{
-    text: `${item.name} — ${item.price_thb} บาท`, callback_data: `buy:${item.id}`
+    text: `ซื้อ ${item.name}  •  ${item.price_thb} บาท`, callback_data: `buy:${item.id}`
   }]);
-  keyboard.push([{ text: '⬅️ กลับเมนู', callback_data: 'menu' }]);
-  return bot.sendMessage(chatId, '💳 เลือกแพ็กเกจที่ต้องการ\n\nชำระอย่างปลอดภัยผ่าน Stripe Checkout', {
-    reply_markup: { inline_keyboard: keyboard }
-  });
+  keyboard.push(homeButton);
+  const details = packages.map((item) => `• <b>${escapeHtml(item.name)}</b> — ${escapeHtml(item.description)}`).join('\n');
+  return render(chatId,
+    `🛒 <b>เลือกแพ็กเกจ</b>\n\n${details}\n\n🔒 ชำระเงินอย่างปลอดภัยผ่าน Stripe\nระบบเติมสิทธิ์ให้อัตโนมัติหลังชำระสำเร็จ`,
+    { inline_keyboard: keyboard }, messageId);
 }
 
-async function createCheckout(chatId, userId, packageId) {
+async function createCheckout(chatId, userId, packageId, messageId) {
   if (!PUBLIC_BASE_URL || !process.env.STRIPE_SECRET_KEY) throw new Error('ยังไม่ได้ตั้ง Stripe หรือ PUBLIC_BASE_URL');
   const pkg = await must(await supabase.from('packages').select('*').eq('id', packageId).eq('active', true).single(), 'อ่านแพ็กเกจ');
   const payment = await must(await supabase.from('payments').insert({
@@ -115,37 +147,44 @@ async function createCheckout(chatId, userId, packageId) {
     cancel_url: `${PUBLIC_BASE_URL}/payment-cancelled`
   }, { idempotencyKey: `checkout_${payment.id}` });
   await must(await supabase.from('payments').update({ stripe_checkout_session_id: session.id }).eq('id', payment.id), 'ผูก Stripe session');
-  return bot.sendMessage(chatId, `แพ็กเกจ: ${pkg.name}\nยอดชำระ: ${pkg.price_thb} บาท\n\nกดปุ่มด้านล่างเพื่อชำระเงิน`, {
-    reply_markup: { inline_keyboard: [[{ text: '🔒 ไปหน้าชำระเงิน Stripe', url: session.url }], [{ text: '⬅️ กลับ', callback_data: 'shop' }]] }
-  });
+  return render(chatId,
+    `🧾 <b>ตรวจสอบรายการ</b>\n\nแพ็กเกจ: <b>${escapeHtml(pkg.name)}</b>\nได้รับ: ${escapeHtml(pkg.description)}\nยอดชำระ: <b>${pkg.price_thb} บาท</b>\n\nกดปุ่มสีด้านล่างเพื่อเปิดหน้าชำระเงิน`,
+    { inline_keyboard: [[{ text: `🔒 ชำระ ${pkg.price_thb} บาท`, url: session.url }], [{ text: '⬅️ เลือกแพ็กเกจอื่น', callback_data: 'shop' }], homeButton] }, messageId);
 }
 
 async function onCallback(query) {
   const chatId = query.message.chat.id;
+  const messageId = query.message.message_id;
   const userId = String(query.from.id);
   await ensureUser(query.from);
   await bot.answerCallbackQuery(query.id, 'กำลังดำเนินการ…').catch(() => {});
   if (query.data === 'accept_terms') {
     await must(await supabase.rpc('accept_terms_and_reward', { p_user_id: userId }), 'ยอมรับเงื่อนไข');
-    return showMenu(chatId, 'เริ่มใช้งานเรียบร้อยแล้ว ✅\nผู้แนะนำได้รับเครดิตเมื่อคุณเริ่มใช้งานจริง');
+    return showMenu(chatId, 'พร้อมใช้งานแล้ว ✅', messageId);
   }
   const user = await getUser(userId);
   if (!user.terms_accepted) return start({ chat: { id: chatId }, from: query.from, text: '/start' });
-  if (query.data === 'menu') return showMenu(chatId);
-  if (query.data === 'account') return showAccount(chatId, userId);
-  if (query.data === 'shop') return showShop(chatId);
+  if (query.data === 'menu') return showMenu(chatId, '', messageId);
+  if (query.data === 'account') return showAccount(chatId, userId, messageId);
+  if (query.data === 'shop') return showShop(chatId, messageId);
   if (query.data === 'referral') {
-    return showMenu(chatId, `👥 ลิงก์แนะนำเพื่อนของคุณ\nhttps://t.me/${botUsername}?start=ref_${user.referral_code}\n\nรับ 1 เครดิตเมื่อเพื่อนยืนยันและใช้งานจริง\nรับเพิ่ม 3 เครดิตเมื่อเพื่อนซื้อครั้งแรก`);
+    return render(chatId,
+      `🎉 <b>ชวนเพื่อน รับเครดิตฟรี</b>\n\nส่งลิงก์นี้ให้เพื่อน:\n<code>https://t.me/${botUsername}?start=ref_${user.referral_code}</code>\n\n🎁 รับ 1 เครดิต เมื่อเพื่อนเริ่มใช้งาน\n🎁 รับเพิ่ม 3 เครดิต เมื่อเพื่อนซื้อครั้งแรก`,
+      { inline_keyboard: [[{ text: '📤 เปิดลิงก์สำหรับส่งต่อ', url: `https://t.me/share/url?url=${encodeURIComponent(`https://t.me/${botUsername}?start=ref_${user.referral_code}`)}` }], homeButton] }, messageId);
   }
-  if (query.data === 'support') return showMenu(chatId, process.env.SUPPORT_TEXT || 'ติดต่อผู้ดูแลผ่านบัญชีที่แจ้งไว้ในหน้าร้าน');
+  if (query.data === 'support') return render(chatId,
+    `❓ <b>วิธีใช้งาน</b>\n\n1. กด “ซื้อเครดิต / แพ็กเกจ”\n2. ชำระเงินผ่าน Stripe\n3. กลับมาที่บอทและกด “รับลิงก์ทันที”\n\n☎️ <b>ติดต่อผู้ดูแล</b>\n${escapeHtml(process.env.SUPPORT_TEXT || 'กรุณาติดต่อบัญชีผู้ดูแลที่แจ้งไว้')}`,
+    { inline_keyboard: [homeButton] }, messageId);
   if (query.data === 'random') {
     const result = await must(await supabase.rpc('claim_random_link', { p_user_id: userId }), 'สุ่มลิงก์');
-    if (result.error === 'no_credit') return showShop(chatId);
-    if (result.error === 'no_link') return showMenu(chatId, 'ขออภัย ตอนนี้ยังไม่มีลิงก์ใหม่สำหรับคุณ กรุณาลองใหม่ภายหลัง');
-    if (result.error) return showMenu(chatId, 'บัญชีนี้ยังไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแล');
-    return showMenu(chatId, `🎁 ลิงก์ของคุณ\n${result.telegram_url}\n\nเครดิตคงเหลือ: ${result.subscribed ? 'สมาชิกใช้งานไม่จำกัด' : result.credits}`);
+    if (result.error === 'no_credit') return showShop(chatId, messageId);
+    if (result.error === 'no_link') return showMenu(chatId, 'ขออภัย ลิงก์ใหม่สำหรับคุณหมดชั่วคราว กรุณาลองอีกครั้งภายหลัง', messageId);
+    if (result.error) return showMenu(chatId, 'บัญชีนี้ยังไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแล', messageId);
+    return render(chatId,
+      `🎁 <b>ลิงก์ของคุณพร้อมแล้ว</b>\n\nกดปุ่ม “เปิดลิงก์” ด้านล่างได้เลย\n\n${result.subscribed ? '⭐ แพ็กเกจไม่จำกัดยังใช้งานอยู่' : `🎟 เครดิตคงเหลือ: <b>${result.credits}</b>`}`,
+      { inline_keyboard: [[{ text: '🚀 เปิดลิงก์', url: result.telegram_url }], [{ text: '🎁 รับลิงก์อีกครั้ง', callback_data: 'random' }], homeButton] }, messageId);
   }
-  if (query.data.startsWith('buy:')) return createCheckout(chatId, userId, query.data.slice(4));
+  if (query.data.startsWith('buy:')) return createCheckout(chatId, userId, query.data.slice(4), messageId);
 }
 
 async function handleUpdate(update) {
