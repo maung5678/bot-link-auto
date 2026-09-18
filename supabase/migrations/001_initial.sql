@@ -94,8 +94,22 @@ alter table public.runtime_status enable row level security;
 revoke all on all tables in schema public from anon, authenticated;
 revoke all on all sequences in schema public from anon, authenticated;
 
+create policy "backend_only_users" on public.users for all to anon, authenticated using (false) with check (false);
+create policy "backend_only_links" on public.links for all to anon, authenticated using (false) with check (false);
+create policy "backend_only_deliveries" on public.deliveries for all to anon, authenticated using (false) with check (false);
+create policy "backend_only_packages" on public.packages for all to anon, authenticated using (false) with check (false);
+create policy "backend_only_payments" on public.payments for all to anon, authenticated using (false) with check (false);
+create policy "backend_only_referrals" on public.referrals for all to anon, authenticated using (false) with check (false);
+create policy "backend_only_runtime_status" on public.runtime_status for all to anon, authenticated using (false) with check (false);
+
+create index if not exists users_invited_by_idx on public.users(invited_by);
+create index if not exists deliveries_link_id_idx on public.deliveries(link_id);
+create index if not exists payments_package_id_idx on public.payments(package_id);
+create index if not exists payments_user_id_idx on public.payments(user_id);
+create index if not exists referrals_inviter_user_id_idx on public.referrals(inviter_user_id);
+
 create or replace function public.claim_random_link(p_user_id text)
-returns jsonb language plpgsql security definer set search_path=public as $$
+returns jsonb language plpgsql security invoker set search_path=public as $$
 declare v_user public.users%rowtype; v_link public.links%rowtype; v_subscribed boolean;
 begin
   select * into v_user from public.users where telegram_id=p_user_id for update;
@@ -112,7 +126,7 @@ begin
 end $$;
 
 create or replace function public.accept_terms_and_reward(p_user_id text)
-returns void language plpgsql security definer set search_path=public as $$
+returns void language plpgsql security invoker set search_path=public as $$
 declare v_ref public.referrals%rowtype;
 begin
   update public.users set terms_accepted=true,updated_at=now() where telegram_id=p_user_id;
@@ -124,7 +138,7 @@ begin
 end $$;
 
 create or replace function public.fulfill_payment(p_payment_id uuid,p_event_id text,p_intent_id text)
-returns jsonb language plpgsql security definer set search_path=public as $$
+returns jsonb language plpgsql security invoker set search_path=public as $$
 declare v_payment public.payments%rowtype; v_package public.packages%rowtype; v_ref public.referrals%rowtype; v_until timestamptz;
 begin
   select * into v_payment from public.payments where id=p_payment_id for update;
@@ -149,6 +163,9 @@ end $$;
 revoke all on function public.claim_random_link(text) from public, anon, authenticated;
 revoke all on function public.accept_terms_and_reward(text) from public, anon, authenticated;
 revoke all on function public.fulfill_payment(uuid,text,text) from public, anon, authenticated;
+grant usage on schema public to service_role;
+grant all on all tables in schema public to service_role;
+grant all on all sequences in schema public to service_role;
 grant execute on function public.claim_random_link(text) to service_role;
 grant execute on function public.accept_terms_and_reward(text) to service_role;
 grant execute on function public.fulfill_payment(uuid,text,text) to service_role;
